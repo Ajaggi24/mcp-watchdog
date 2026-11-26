@@ -149,3 +149,7 @@ async with connect("python my_server.py", ApprovalStore()) as g:
 [mcp-scan](https://github.com/invariantlabs-ai/mcp-scan), RugSnare, toolprint, mcp-pin and agent-aegis detect tool-definition changes by hash pinning. AI Security Gateway also assigns change severities. OWASP's MCP Top 10 recommends definition pinning with re-review. I couldn't find a public evaluation of how well change *prioritization* works, and that evaluation is this project's main contribution.
 
 Built with the MCP Python SDK 2.3. Requires Python 3.10+.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

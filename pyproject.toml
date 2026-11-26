@@ -1,6 +1,8 @@
 [project]
 name = "mcp-watchdog"
 version = "0.1.0"
+license = "MIT"
+license-files = ["LICENSE"]
 description = "Pause MCP tools whose definitions changed after you approved them."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +15,7 @@ dev = ["pytest>=8"]
 mcpwatchdog = "mcpwatchdog.cli:main"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
