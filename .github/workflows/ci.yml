@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Rule files match the frozen v2 hashes
+        run: sha256sum -c bench/FROZEN_RULES_v2.sha256
+
+      - name: Tests
+        run: pytest -q
+
+      - name: Evaluate on dev cases
+        run: python bench/evaluate.py bench/cases/dev.json /tmp/results
+
+      - name: Approval gate never weakened (dev + v1 held-out)
+        run: |
+          python - <<'EOF'
+          import sys
+          sys.path.insert(0, "bench")
+          from evaluate import evaluate
+          from pathlib import Path
+          for name in ("dev", "heldout"):
+              m = evaluate(Path(f"bench/cases/{name}.json"))
+              missed = m["gate"]["needs_review_missed_by_watchdog"]
+              print(f"{name}: changes that skipped review = {missed}")
+              assert missed == 0, f"{name}: {missed} change(s) would skip review"
+          EOF

@@ -1,5 +1,7 @@
 # MCP Watchdog
 
+[![CI](https://github.com/Ajaggi24/mcp-watchdog/actions/workflows/ci.yml/badge.svg)](https://github.com/Ajaggi24/mcp-watchdog/actions/workflows/ci.yml)
+
 **Is the tool my agent is about to call still the one I approved?**
 
 An AI agent's tool definition can change after a developer approves it. A change alert tells the developer to look, but they still have to work out what changed and how urgently it needs review. MCP Watchdog shows the exact change, explains the review priority it assigned, and pauses calls to the changed tool until a developer approves it.
@@ -28,7 +30,7 @@ OWASP's Q3 2026 GenAI exploit roundup describes an MCP server that behaved norma
 pip install -e ".[dev]"
 python demo/live_demo.py          # the scripted demo
 python demo/live_demo.py --step   # press Enter between scenes, for recording
-pytest -q                         # 25 tests, including live stdio sessions
+pytest -q                         # 25 tests, including live stdio sessions (also run by CI on every push)
 ```
 
 ## CLI

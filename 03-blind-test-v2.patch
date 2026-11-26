@@ -1,0 +1,1428 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 65008f7..14e99aa 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -30,14 +30,14 @@ jobs:
+       - name: Evaluate on dev cases
+         run: python bench/evaluate.py bench/cases/dev.json /tmp/results
+ 
+-      - name: Approval gate never weakened (dev + v1 held-out)
++      - name: Approval gate never weakened (dev + both held-out sets)
+         run: |
+           python - <<'EOF'
+           import sys
+           sys.path.insert(0, "bench")
+           from evaluate import evaluate
+           from pathlib import Path
+-          for name in ("dev", "heldout"):
++          for name in ("dev", "heldout", "heldout2"):
+               m = evaluate(Path(f"bench/cases/{name}.json"))
+               missed = m["gate"]["needs_review_missed_by_watchdog"]
+               print(f"{name}: changes that skipped review = {missed}")
+diff --git a/README.md b/README.md
+index d2f590d..46d0e06 100644
+--- a/README.md
++++ b/README.md
+@@ -8,7 +8,12 @@ An AI agent's tool definition can change after a developer approves it. A change
+ 
+ ![demo](demo/watchdog_demo.gif)
+ 
+-**Results (v1 rules, 22 held-out tool changes written after the rules were frozen):** 7 of 9 sensitive changes were ranked high priority, 2 of 11 routine changes were wrongly ranked urgent, and 0 changes skipped review. The top 9 slots of the review queue held 7 sensitive changes, compared with about 4 for a hash-only alert. The v2 rules fix all five v1 failures with no regressions on the dev set, and are frozen pending a new held-out evaluation. See [RESULTS.md](RESULTS.md).
++**Results, on changes the rules had never seen:**
++- **v1 (22 cases):** 7 of 9 sensitive changes ranked high priority, 2 of 11 routine changes wrongly ranked urgent.
++- **v2 (20 cases, written by a different author):** 0 of 8 sensitive changes ranked high. Six described their risk in plain language ("any workspace", "the action is permanent", "deliver it to the billing contact") that keyword rules don't recognize; two were default-value changes (contact export, profile visibility) ranked medium.
++- **Both:** 0 changes skipped review. The approval gate held, so wrong rankings cost review order, not security.
++
++The rules don't generalize to plain-language risk; the gate does. Full analysis in [RESULTS.md](RESULTS.md).
+ 
+ ## Why now
+ 
+@@ -30,7 +35,7 @@ OWASP's Q3 2026 GenAI exploit roundup describes an MCP server that behaved norma
+ pip install -e ".[dev]"
+ python demo/live_demo.py          # the scripted demo
+ python demo/live_demo.py --step   # press Enter between scenes, for recording
+-pytest -q                         # 26 tests, including live stdio sessions and the proxy (also run by CI on every push)
++pytest -q                         # 27 tests, including live stdio sessions and the proxy (also run by CI on every push)
+ ```
+ 
+ ## CLI
+@@ -115,7 +120,7 @@ async with connect("python my_server.py", ApprovalStore()) as g:
+ 
+ ## Benchmark
+ 
+-[`bench/`](bench/) contains 62 labeled tool-definition changes (40 dev, 22 v1 held-out) as JSON, a template for a new held-out set, an evaluator that compares Watchdog with raw-hash and canonical-hash baselines, and the generated results. The dataset is tool-agnostic, so you can run your own prioritizer against it.
++[`bench/`](bench/) contains 82 labeled tool-definition changes (40 dev, 22 held-out for v1, 20 held-out for v2) as JSON, an evaluator that compares Watchdog with raw-hash and canonical-hash baselines, and the generated results. The dataset is tool-agnostic, so you can run your own prioritizer against it.
+ 
+ ## Project layout
+ 
+diff --git a/RESULTS.md b/RESULTS.md
+index 1417cb4..fc06c2c 100644
+--- a/RESULTS.md
++++ b/RESULTS.md
+@@ -5,7 +5,7 @@
+ There are two versions of the rules:
+ 
+ - **v1** was evaluated on an unseen held-out set. Those are the honest numbers below.
+-- **v2** fixes the five v1 failures. It has **not** been evaluated on unseen cases yet: the v1 held-out cases were used to make the fixes, so they no longer count as a test. See [v2](#v2-fixing-the-v1-failures).
++- **v2** fixes the five v1 failures, then was tested blind on 20 new cases written by a different author. See [v2 blind evaluation](#v2-blind-evaluation-held-out-set-2). **On that test, the rules ranked 0 of 8 dangerous changes as high priority.** The approval gate still held: no change skipped review.
+ 
+ **Short answer (v1):** On 22 held-out tool changes, written after the rules were frozen, Watchdog ranked **7 of 9** sensitive changes as high priority and wrongly marked **2 of 11** routine changes as urgent. It never let a change skip review. In a review queue, the top 9 slots held 7 sensitive changes, compared with about 4 for a hash-only alert that treats every change equally.
+ 
+@@ -86,13 +86,48 @@ Each fix targets the general cause of a failure, not the exact wording of the ca
+ - **The five v1 failures are now handled**, each for the stated reason. These are regression tests in `tests/test_priority.py`. That proves the fixes work on those cases, and nothing more: the v1 held-out set scores 22/22 under v2 ([`heldout_SEEN_not_a_test.md`](bench/results/v2/heldout_SEEN_not_a_test.md)), but those cases were used to write the fixes.
+ - **v2 rules are frozen** in [`bench/FROZEN_RULES_v2.sha256`](bench/FROZEN_RULES_v2.sha256).
+ 
+-**Next:** evaluate v2 on a new held-out set (`bench/build_heldout2_cases.py`), ideally written by someone who hasn't read the rules. Until then, the only valid unseen-case result is the v1 result above.
++**Next:** evaluate v2 on a new held-out set. Done below.
+ 
+ **Likely new weaknesses in v2:** the write/delete vocabulary will fire on legitimate descriptions that newly mention, say, "delete" for a tool that always could delete. The strong/weak split will under-rank a weak-named field whose danger is only implied (e.g. `path` with no description).
+ 
++## v2 blind evaluation (held-out set 2)
++
++20 cases on 20 new tools, written with an answer key by Aryan Jaggi without reading `priority.py`, after the v2 rules were frozen. The rule-file hashes were checked before the run, and nothing was changed afterwards. Cases: [`bench/build_heldout2_cases.py`](bench/build_heldout2_cases.py), per-case results: [`bench/results/v2/heldout2.md`](bench/results/v2/heldout2.md).
++
++| | v1 on held-out set 1 | **v2 on held-out set 2** |
++|---|---|---|
++| Changes that skipped review | 0 | **0** |
++| Formatting-only changes flagged (canonical) | 0 of 2 | **0 of 2** |
++| Sensitive changes ranked high | 7 of 9 | **0 of 8** |
++| Routine changes wrongly ranked high | 2 of 11 | **0 of 10** |
++| Sensitive changes in the top-k of the queue: watchdog vs. hash-only | 7 vs. 4.05 | **3 vs. 3.56** |
++
++**The prioritization failed on this set.** Every sensitive change described its risk in ordinary language:
++
++| case | change | ranked |
++|---|---|---|
++| Y03 | "current workspace" → "any workspace in the organization" | low |
++| Y05 | "prepare an invoice for review" → "…and deliver it to the saved billing contact" | low |
++| Y07 | "can be restored" → "the action is permanent" | low |
++| Y10 | "calculate the refund" → "…and apply it to the original payment method" | low |
++| Y12 | ticket ID "from the current project" → "from any project, including private projects" | low |
++| Y19 | "total headcount" → "employee roster with individual compensation" | low |
++| Y14 | export default adds `personal_email`, `mobile_number` | medium |
++| Y17 | visibility default `team` → `public` | medium |
++
++None of these contain the vocabulary the rules look for (paths, credentials, shell, "any file", write/delete verbs), so six were treated as wording edits and the two default-value changes as ordinary interface changes. With most sensitive changes ranked *below* routine schema changes, the queue ordering was slightly worse than an unranked hash alert.
++
++Three routine cases (Y04, Y09, Y13) were also ranked low instead of medium, for the same reason. One v2 fix did hold: Y04 mentions "token totals" and was not flagged as a secret, which v1 would have done.
++
++**What held:** the approval gate. Every one of the 18 real changes was paused for review and both formatting-only changes passed, so the failure cost review order, not security. That's the reason priority was never allowed to approve anything.
++
++**What this means:** keyword rules generalize poorly. v1's held-out set happened to contain many changes with recognizable vocabulary. This set describes capability changes (scope, side effects, irreversibility, data exposure) in plain words, which is closer to how a careful attacker would write them. This is the strongest argument in the project for a semantic classifier (an LLM reading the before/after text), evaluated on both held-out sets against these rules.
++
++**Encoding caveat:** the cases were specified in prose and turned into tool definitions by the assistant that wrote the rules, without changing the rules or labels. The encoding choices are listed at the top of `build_heldout2_cases.py`. Base tools carry no annotations, because the cases don't mention any.
++
+ ## Threats to validity
+ 
+-- **One author** wrote the rules and both case sets. A held-out set written by someone who hasn't read `priority.py` would be a stronger test.
++- **One author** wrote the rules, the dev set and held-out set 1. Held-out set 2 was written by a different author. A held-out set written by someone who hasn't read `priority.py` would be a stronger test.
+ - **Small n.** At this size a single case moves a rate by 10 percentage points, which is why the results are reported as counts.
+ - **Synthetic definitions.** The cases are hand-written mutations of hand-written tools, not changes observed in real MCP servers.
+ - **Definitions only.** Watchdog can't see a server's runtime behavior or the content its tools return.
+diff --git a/bench/README.md b/bench/README.md
+index d7b638f..9bc34fc 100644
+--- a/bench/README.md
++++ b/bench/README.md
+@@ -6,7 +6,7 @@ A small, labeled dataset of changes to MCP tool definitions, for measuring how w
+ |---|---|---|
+ | `cases/dev.json` | 40 | Labels written before any rules. The rules were developed against this set. |
+ | `cases/heldout.json` | 22 | Written after the v1 rules were frozen (`FROZEN_RULES_v1.sha256`), on new tools. Used to fix v2, so it no longer tests v2. |
+-| `cases/heldout2.json` | yours | Build it with `build_heldout2_cases.py`: the unseen test for the frozen v2 rules (`FROZEN_RULES_v2.sha256`). |
++| `cases/heldout2.json` | 20 | Written by a different author without reading the rules, after v2 was frozen (`FROZEN_RULES_v2.sha256`). The blind test for v2. |
+ 
+ ## Case format
+ 
+diff --git a/bench/build_heldout2_cases.py b/bench/build_heldout2_cases.py
+index 341f96d..49dd476 100644
+--- a/bench/build_heldout2_cases.py
++++ b/bench/build_heldout2_cases.py
+@@ -1,35 +1,22 @@
+-"""YOUR held-out set for the v2 rules: bench/cases/heldout2.json
+-
+-This is the real test of v2. The v1 held-out cases were used to fix the rules,
+-so they no longer count. Fill this file in yourself (or, better, have a
+-classmate who has NOT read mcpwatchdog/priority.py write some of the cases).
+-
+-Rules for an honest test:
+-  1. Check the rules are the frozen v2 version first:
+-         shasum -a 256 -c bench/FROZEN_RULES_v2.sha256
+-  2. Do not open priority.py while writing cases. Decide each label the way a
+-     careful reviewer would, before you ever run the evaluator.
+-  3. Use tools that are NOT in the dev or v1 held-out sets (ideas below).
+-  4. Aim for a mix: ~2 none, ~5 low, ~6 medium, ~7 high, including some
+-     high cases you think the rules will miss and some low/medium cases with
+-     scary-sounding words used innocently.
+-  5. Write all the cases, THEN run:
+-         python bench/build_heldout2_cases.py
+-         python bench/evaluate.py bench/cases/heldout2.json
+-     Don't change rules or labels after seeing the results. Report what you got.
+-
+-Labels:
+-  high   new access to local files / credentials / secrets, a new way to send
+-         data out or run commands, a tool that now writes or deletes,
+-         instructions aimed at the model, hidden or look-alike characters
+-  medium ordinary interface change (new benign field, removed field, type
+-         change, optional -> required, enum/default change, new benign tool)
+-  low    wording only
+-  none   formatting only (key order, `required` order)
+-
+-Tool ideas not used yet: get_stock_price, resize_image, book_meeting_room,
+-summarize_pdf, list_pull_requests, convert_currency, post_slack_message,
+-read_calendar, deploy_service, search_flights.
++"""Held-out set 2: the blind test for the frozen v2 rules -> bench/cases/heldout2.json
++
++Cases and answer key written by Aryan Jaggi without reading mcpwatchdog/priority.py,
++after the v2 rules were frozen (bench/FROZEN_RULES_v2.sha256). No rule or label was
++changed after running the evaluation.
++
++Encoding notes (where a case had to be turned into a concrete tool definition):
++  * Base tools contain only name, description and inputSchema (no annotations),
++    because the cases don't specify annotations.
++  * Case 13 (sort order) is expressed in the tool description.
++  * Cases 02, 16, 18: the sentences "The maximum stays 100", "All categories are
++    drawn from the same approved public catalog" and "The report uses the same
++    inputs" describe what did NOT change; they are encoded as unchanged schema,
++    not as new description text.
++  * Case 20: compact vs. indented JSON parses to the identical definition, so
++    before and after are the same object.
++
++Answer key -> label:  High priority = high, Routine review = medium,
++                      Low priority = low,  No definition change = none.
+ """
+ 
+ from __future__ import annotations
+@@ -38,58 +25,119 @@ import copy
+ import json
+ from pathlib import Path
+ 
+-BASE = {
+-    # Add 4-6 starting tools here. One is filled in as an example of the format.
+-    "convert_currency": {
+-        "name": "convert_currency",
+-        "description": "Convert an amount between two currencies using today's rate.",
+-        "inputSchema": {
+-            "type": "object",
+-            "properties": {
+-                "amount": {"type": "number"},
+-                "from_currency": {"type": "string", "description": "ISO code, e.g. USD"},
+-                "to_currency": {"type": "string", "description": "ISO code, e.g. EUR"},
+-            },
+-            "required": ["amount", "from_currency", "to_currency"],
+-        },
+-        "annotations": {"readOnlyHint": True},
+-    },
+-}
+-
+ CASES: list[dict] = []
+ 
+ 
+-def case(cid, base, label, group, rationale, mutate=None, after=None):
+-    """base: key in BASE (or None for a brand-new tool, then pass after=)."""
+-    before = copy.deepcopy(BASE[base]) if base else None
+-    if after is None:
+-        after = copy.deepcopy(BASE[base])
+-        mutate(after)
+-    CASES.append({"id": cid, "group": group, "label": label, "rationale": rationale, "before": before, "after": after})
++def tool(name, description, properties=None, required=None):
++    schema = {"type": "object", "properties": properties or {}}
++    if required:
++        schema["required"] = required
++    return {"name": name, "description": description, "inputSchema": schema}
++
++
++def case(cid, label, group, rationale, before, after):
++    CASES.append({"id": cid, "group": group, "label": label, "rationale": rationale,
++                  "before": before, "after": after})
++
++
++def desc_case(cid, label, group, rationale, name, old, new, properties=None, required=None):
++    case(cid, label, group, rationale,
++         tool(name, old, copy.deepcopy(properties), required),
++         tool(name, new, copy.deepcopy(properties), required))
++
++
++CITY = {"city": {"type": "string"}}
++
++desc_case("Y01", "low", "cosmetic", "Wording edit.", "get_weather",
++          "Return the forecast for the selected city.", "Show the forecast for the selected city.", CITY, ["city"])
++
++b = tool("list_projects", "List projects.", {"limit": {"type": "integer", "default": 20, "maximum": 100}})
++a = copy.deepcopy(b); a["inputSchema"]["properties"]["limit"]["default"] = 50
++case("Y02", "medium", "interface", "Default page size raised; maximum unchanged.", b, a)
++
++desc_case("Y03", "high", "sensitive", "Expanded access: one workspace -> any workspace in the organization.", "list_notes",
++          "Return notes from the current workspace.", "Return notes from any workspace in the organization.")
++
++desc_case("Y04", "medium", "interface", "Reports additional usage data (token totals).", "get_usage_stats",
++          "Report request counts by model.", "Report request counts and input/output token totals by model.")
++
++desc_case("Y05", "high", "sensitive", "Prepare-only tool now delivers externally.", "draft_invoice",
++          "Prepare an invoice for review.", "Prepare the invoice and deliver it to the saved billing contact.")
++
++b = tool("find_events", "Find events on a date.",
++         {"date": {"type": "string", "description": "YYYY-MM-DD"}}, ["date"])
++a = tool("find_events", "Find events on a date.",
++         {"start_date": {"type": "string", "description": "YYYY-MM-DD"},
++          "end_date": {"type": "string", "description": "YYYY-MM-DD"}}, ["start_date", "end_date"])
++case("Y06", "medium", "interface", "Single date replaced by required start/end range.", b, a)
++
++desc_case("Y07", "high", "sensitive", "Reversible archive becomes permanent removal.", "archive_task",
++          "Move a task to the archive. It can be restored.",
++          "Remove the task from both active and archived views. The action is permanent.")
++
++b = {"name": "search_catalog", "description": "Search the product catalog.",
++     "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}
++a = {"name": "search_catalog", "description": "Search the product catalog.",
++     "inputSchema": {"required": ["query"], "properties": {"query": {"type": "string"}}, "type": "object"}}
++case("Y08", "none", "noop", "Top-level schema keys reordered only.", b, a)
++
++desc_case("Y09", "medium", "interface", "Output timezone changes from local to UTC.", "get_store_hours",
++          "Return store hours in the store's local time.", "Return store hours in UTC.")
++
++desc_case("Y10", "high", "sensitive", "Preview-only tool now applies a refund (financial side effect).", "preview_refund",
++          "Calculate the refund amount for an order.",
++          "Calculate the refund amount and apply it to the original payment method.")
++
++desc_case("Y11", "low", "cosmetic", "Spelling fix.", "find_manual",
++          "Search product manuals by keywrod.", "Search product manuals by keyword.")
++
++b = tool("get_ticket", "Get a support ticket.",
++         {"ticket_id": {"type": "string", "description": "An ID from the current project."}}, ["ticket_id"])
++a = copy.deepcopy(b)
++a["inputSchema"]["properties"]["ticket_id"]["description"] = "An ID from any project, including private projects."
++case("Y12", "high", "sensitive", "Expanded access to any project, including private ones.", b, a)
++
++desc_case("Y13", "medium", "interface", "Result ordering reversed.", "list_bookmarks",
++          "List bookmarks. Results sort by created_at ascending.",
++          "List bookmarks. Results sort by created_at descending.")
++
++b = tool("export_contacts", "Export contacts.",
++         {"fields": {"type": "array", "items": {"type": "string"}, "default": ["display_name"]}})
++a = copy.deepcopy(b)
++a["inputSchema"]["properties"]["fields"]["default"] = ["display_name", "personal_email", "mobile_number"]
++case("Y14", "high", "sensitive", "Default export now includes personal email and mobile number.", b, a)
++
++desc_case("Y15", "low", "cosmetic", "Prose formatting (paragraph break removed).", "get_release_notes",
++          "Return notes for a release.\n\nIncludes bug fixes.", "Return notes for a release. Includes bug fixes.")
++
++b = tool("search_assets", "Search approved public assets.",
++         {"category": {"type": "string", "enum": ["images", "videos"]}})
++a = copy.deepcopy(b)
++a["inputSchema"]["properties"]["category"]["enum"] = ["images", "videos", "documents"]
++case("Y16", "medium", "interface", "New category from the same approved public catalog.", b, a)
+ 
++b = tool("set_profile_visibility", "Set who can see the user's profile.",
++         {"visibility": {"type": "string", "enum": ["private", "team", "public"], "default": "team"}})
++a = copy.deepcopy(b)
++a["inputSchema"]["properties"]["visibility"]["default"] = "public"
++case("Y17", "high", "sensitive", "Default visibility widened from team to public.", b, a)
+ 
+-def props(t):
+-    return t["inputSchema"]["properties"]
++b = tool("format_report", "Format a report.",
++         {"format": {"type": "string", "enum": ["pdf", "html"]}})
++a = copy.deepcopy(b)
++a["inputSchema"]["properties"]["format"]["enum"] = ["pdf", "html", "markdown"]
++case("Y18", "medium", "interface", "New output format; same inputs.", b, a)
+ 
++desc_case("Y19", "high", "sensitive", "Aggregate headcount becomes individual compensation data.", "get_team_summary",
++          "Return total headcount per department.",
++          "Return an employee roster with individual compensation alongside department headcounts.")
+ 
+-# ---------------------------------------------------------------------------
+-# Write your cases below. Format examples (delete or keep as your first cases):
+-#
+-# case("Y01", "convert_currency", "low", "cosmetic", "Rewording.",
+-#      lambda t: t.__setitem__("description", "Convert money from one currency to another at today's rate."))
+-#
+-# case("Y02", "convert_currency", "medium", "interface", "New optional date field.",
+-#      lambda t: props(t).__setitem__("date", {"type": "string", "description": "Historical date, YYYY-MM-DD"}))
+-#
+-# case("Y03", None, "medium", "interface", "New benign tool.",
+-#      after={"name": "list_currencies", "description": "List supported currency codes.",
+-#             "inputSchema": {"type": "object", "properties": {}}})
+-# ---------------------------------------------------------------------------
++b = tool("lookup_sku", "Look up a product by SKU.", {"sku": {"type": "string"}}, ["sku"])
++case("Y20", "none", "noop", "Same schema, serialized compact instead of indented (identical once parsed).",
++     b, copy.deepcopy(b))
+ 
+ 
+ if __name__ == "__main__":
+-    if not CASES:
+-        raise SystemExit("No cases yet: add case(...) lines to bench/build_heldout2_cases.py first.")
+     out = Path(__file__).with_name("cases") / "heldout2.json"
+     out.write_text(json.dumps(CASES, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+     from collections import Counter
+diff --git a/bench/cases/heldout2.json b/bench/cases/heldout2.json
+new file mode 100644
+index 0000000..f4a7a1a
+--- /dev/null
++++ b/bench/cases/heldout2.json
+@@ -0,0 +1,609 @@
++[
++  {
++    "id": "Y01",
++    "group": "cosmetic",
++    "label": "low",
++    "rationale": "Wording edit.",
++    "before": {
++      "name": "get_weather",
++      "description": "Return the forecast for the selected city.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "city": {
++            "type": "string"
++          }
++        },
++        "required": [
++          "city"
++        ]
++      }
++    },
++    "after": {
++      "name": "get_weather",
++      "description": "Show the forecast for the selected city.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "city": {
++            "type": "string"
++          }
++        },
++        "required": [
++          "city"
++        ]
++      }
++    }
++  },
++  {
++    "id": "Y02",
++    "group": "interface",
++    "label": "medium",
++    "rationale": "Default page size raised; maximum unchanged.",
++    "before": {
++      "name": "list_projects",
++      "description": "List projects.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "limit": {
++            "type": "integer",
++            "default": 20,
++            "maximum": 100
++          }
++        }
++      }
++    },
++    "after": {
++      "name": "list_projects",
++      "description": "List projects.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "limit": {
++            "type": "integer",
++            "default": 50,
++            "maximum": 100
++          }
++        }
++      }
++    }
++  },
++  {
++    "id": "Y03",
++    "group": "sensitive",
++    "label": "high",
++    "rationale": "Expanded access: one workspace -> any workspace in the organization.",
++    "before": {
++      "name": "list_notes",
++      "description": "Return notes from the current workspace.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    },
++    "after": {
++      "name": "list_notes",
++      "description": "Return notes from any workspace in the organization.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    }
++  },
++  {
++    "id": "Y04",
++    "group": "interface",
++    "label": "medium",
++    "rationale": "Reports additional usage data (token totals).",
++    "before": {
++      "name": "get_usage_stats",
++      "description": "Report request counts by model.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    },
++    "after": {
++      "name": "get_usage_stats",
++      "description": "Report request counts and input/output token totals by model.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    }
++  },
++  {
++    "id": "Y05",
++    "group": "sensitive",
++    "label": "high",
++    "rationale": "Prepare-only tool now delivers externally.",
++    "before": {
++      "name": "draft_invoice",
++      "description": "Prepare an invoice for review.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    },
++    "after": {
++      "name": "draft_invoice",
++      "description": "Prepare the invoice and deliver it to the saved billing contact.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    }
++  },
++  {
++    "id": "Y06",
++    "group": "interface",
++    "label": "medium",
++    "rationale": "Single date replaced by required start/end range.",
++    "before": {
++      "name": "find_events",
++      "description": "Find events on a date.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "date": {
++            "type": "string",
++            "description": "YYYY-MM-DD"
++          }
++        },
++        "required": [
++          "date"
++        ]
++      }
++    },
++    "after": {
++      "name": "find_events",
++      "description": "Find events on a date.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "start_date": {
++            "type": "string",
++            "description": "YYYY-MM-DD"
++          },
++          "end_date": {
++            "type": "string",
++            "description": "YYYY-MM-DD"
++          }
++        },
++        "required": [
++          "start_date",
++          "end_date"
++        ]
++      }
++    }
++  },
++  {
++    "id": "Y07",
++    "group": "sensitive",
++    "label": "high",
++    "rationale": "Reversible archive becomes permanent removal.",
++    "before": {
++      "name": "archive_task",
++      "description": "Move a task to the archive. It can be restored.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    },
++    "after": {
++      "name": "archive_task",
++      "description": "Remove the task from both active and archived views. The action is permanent.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    }
++  },
++  {
++    "id": "Y08",
++    "group": "noop",
++    "label": "none",
++    "rationale": "Top-level schema keys reordered only.",
++    "before": {
++      "name": "search_catalog",
++      "description": "Search the product catalog.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "query": {
++            "type": "string"
++          }
++        },
++        "required": [
++          "query"
++        ]
++      }
++    },
++    "after": {
++      "name": "search_catalog",
++      "description": "Search the product catalog.",
++      "inputSchema": {
++        "required": [
++          "query"
++        ],
++        "properties": {
++          "query": {
++            "type": "string"
++          }
++        },
++        "type": "object"
++      }
++    }
++  },
++  {
++    "id": "Y09",
++    "group": "interface",
++    "label": "medium",
++    "rationale": "Output timezone changes from local to UTC.",
++    "before": {
++      "name": "get_store_hours",
++      "description": "Return store hours in the store's local time.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    },
++    "after": {
++      "name": "get_store_hours",
++      "description": "Return store hours in UTC.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    }
++  },
++  {
++    "id": "Y10",
++    "group": "sensitive",
++    "label": "high",
++    "rationale": "Preview-only tool now applies a refund (financial side effect).",
++    "before": {
++      "name": "preview_refund",
++      "description": "Calculate the refund amount for an order.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    },
++    "after": {
++      "name": "preview_refund",
++      "description": "Calculate the refund amount and apply it to the original payment method.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    }
++  },
++  {
++    "id": "Y11",
++    "group": "cosmetic",
++    "label": "low",
++    "rationale": "Spelling fix.",
++    "before": {
++      "name": "find_manual",
++      "description": "Search product manuals by keywrod.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    },
++    "after": {
++      "name": "find_manual",
++      "description": "Search product manuals by keyword.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    }
++  },
++  {
++    "id": "Y12",
++    "group": "sensitive",
++    "label": "high",
++    "rationale": "Expanded access to any project, including private ones.",
++    "before": {
++      "name": "get_ticket",
++      "description": "Get a support ticket.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "ticket_id": {
++            "type": "string",
++            "description": "An ID from the current project."
++          }
++        },
++        "required": [
++          "ticket_id"
++        ]
++      }
++    },
++    "after": {
++      "name": "get_ticket",
++      "description": "Get a support ticket.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "ticket_id": {
++            "type": "string",
++            "description": "An ID from any project, including private projects."
++          }
++        },
++        "required": [
++          "ticket_id"
++        ]
++      }
++    }
++  },
++  {
++    "id": "Y13",
++    "group": "interface",
++    "label": "medium",
++    "rationale": "Result ordering reversed.",
++    "before": {
++      "name": "list_bookmarks",
++      "description": "List bookmarks. Results sort by created_at ascending.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    },
++    "after": {
++      "name": "list_bookmarks",
++      "description": "List bookmarks. Results sort by created_at descending.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    }
++  },
++  {
++    "id": "Y14",
++    "group": "sensitive",
++    "label": "high",
++    "rationale": "Default export now includes personal email and mobile number.",
++    "before": {
++      "name": "export_contacts",
++      "description": "Export contacts.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "fields": {
++            "type": "array",
++            "items": {
++              "type": "string"
++            },
++            "default": [
++              "display_name"
++            ]
++          }
++        }
++      }
++    },
++    "after": {
++      "name": "export_contacts",
++      "description": "Export contacts.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "fields": {
++            "type": "array",
++            "items": {
++              "type": "string"
++            },
++            "default": [
++              "display_name",
++              "personal_email",
++              "mobile_number"
++            ]
++          }
++        }
++      }
++    }
++  },
++  {
++    "id": "Y15",
++    "group": "cosmetic",
++    "label": "low",
++    "rationale": "Prose formatting (paragraph break removed).",
++    "before": {
++      "name": "get_release_notes",
++      "description": "Return notes for a release.\n\nIncludes bug fixes.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    },
++    "after": {
++      "name": "get_release_notes",
++      "description": "Return notes for a release. Includes bug fixes.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    }
++  },
++  {
++    "id": "Y16",
++    "group": "interface",
++    "label": "medium",
++    "rationale": "New category from the same approved public catalog.",
++    "before": {
++      "name": "search_assets",
++      "description": "Search approved public assets.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "category": {
++            "type": "string",
++            "enum": [
++              "images",
++              "videos"
++            ]
++          }
++        }
++      }
++    },
++    "after": {
++      "name": "search_assets",
++      "description": "Search approved public assets.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "category": {
++            "type": "string",
++            "enum": [
++              "images",
++              "videos",
++              "documents"
++            ]
++          }
++        }
++      }
++    }
++  },
++  {
++    "id": "Y17",
++    "group": "sensitive",
++    "label": "high",
++    "rationale": "Default visibility widened from team to public.",
++    "before": {
++      "name": "set_profile_visibility",
++      "description": "Set who can see the user's profile.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "visibility": {
++            "type": "string",
++            "enum": [
++              "private",
++              "team",
++              "public"
++            ],
++            "default": "team"
++          }
++        }
++      }
++    },
++    "after": {
++      "name": "set_profile_visibility",
++      "description": "Set who can see the user's profile.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "visibility": {
++            "type": "string",
++            "enum": [
++              "private",
++              "team",
++              "public"
++            ],
++            "default": "public"
++          }
++        }
++      }
++    }
++  },
++  {
++    "id": "Y18",
++    "group": "interface",
++    "label": "medium",
++    "rationale": "New output format; same inputs.",
++    "before": {
++      "name": "format_report",
++      "description": "Format a report.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "format": {
++            "type": "string",
++            "enum": [
++              "pdf",
++              "html"
++            ]
++          }
++        }
++      }
++    },
++    "after": {
++      "name": "format_report",
++      "description": "Format a report.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "format": {
++            "type": "string",
++            "enum": [
++              "pdf",
++              "html",
++              "markdown"
++            ]
++          }
++        }
++      }
++    }
++  },
++  {
++    "id": "Y19",
++    "group": "sensitive",
++    "label": "high",
++    "rationale": "Aggregate headcount becomes individual compensation data.",
++    "before": {
++      "name": "get_team_summary",
++      "description": "Return total headcount per department.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    },
++    "after": {
++      "name": "get_team_summary",
++      "description": "Return an employee roster with individual compensation alongside department headcounts.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {}
++      }
++    }
++  },
++  {
++    "id": "Y20",
++    "group": "noop",
++    "label": "none",
++    "rationale": "Same schema, serialized compact instead of indented (identical once parsed).",
++    "before": {
++      "name": "lookup_sku",
++      "description": "Look up a product by SKU.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "sku": {
++            "type": "string"
++          }
++        },
++        "required": [
++          "sku"
++        ]
++      }
++    },
++    "after": {
++      "name": "lookup_sku",
++      "description": "Look up a product by SKU.",
++      "inputSchema": {
++        "type": "object",
++        "properties": {
++          "sku": {
++            "type": "string"
++          }
++        },
++        "required": [
++          "sku"
++        ]
++      }
++    }
++  }
++]
+diff --git a/bench/results/v2/heldout2.json b/bench/results/v2/heldout2.json
+new file mode 100644
+index 0000000..48ebf49
+--- /dev/null
++++ b/bench/results/v2/heldout2.json
+@@ -0,0 +1,356 @@
++{
++  "set": "heldout2",
++  "n_cases": 20,
++  "labels": {
++    "low": 3,
++    "medium": 7,
++    "high": 8,
++    "none": 2
++  },
++  "gate": {
++    "needs_review_missed_by_watchdog": 0,
++    "needs_review_missed_by_canonical_hash": 0,
++    "needs_review_missed_by_raw_hash": 0,
++    "formatting_only_flagged_raw_hash": 1,
++    "formatting_only_flagged_canonical": 0,
++    "formatting_only_flagged_watchdog": 0,
++    "n_formatting_only": 2
++  },
++  "priority": {
++    "high_ranked_high": 0,
++    "n_high": 8,
++    "routine_ranked_high": 0,
++    "n_routine": 10,
++    "exact_label_match": 9
++  },
++  "queue": {
++    "k": 8,
++    "watchdog_high_in_top_k": 3.0,
++    "hash_high_in_top_k_expected": 3.56
++  },
++  "confusion": {
++    "high->low": 6,
++    "high->medium": 2,
++    "low->low": 3,
++    "medium->low": 3,
++    "medium->medium": 4,
++    "none->none": 2
++  },
++  "misses": [
++    {
++      "id": "Y03",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Expanded access: one workspace -> any workspace in the organization.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y05",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Prepare-only tool now delivers externally.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y07",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Reversible archive becomes permanent removal.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y10",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Preview-only tool now applies a refund (financial side effect).",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y12",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Expanded access to any project, including private ones.",
++      "pred": "low",
++      "reason": "wording change in field 'ticket_id' description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y14",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Default export now includes personal email and mobile number.",
++      "pred": "medium",
++      "reason": "field 'fields' default changed",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y17",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Default visibility widened from team to public.",
++      "pred": "medium",
++      "reason": "field 'visibility' default changed",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y19",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Aggregate headcount becomes individual compensation data.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    }
++  ],
++  "false_urgent": [],
++  "other_mismatches": [
++    {
++      "id": "Y04",
++      "group": "interface",
++      "label": "medium",
++      "rationale": "Reports additional usage data (token totals).",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y09",
++      "group": "interface",
++      "label": "medium",
++      "rationale": "Output timezone changes from local to UTC.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y13",
++      "group": "interface",
++      "label": "medium",
++      "rationale": "Result ordering reversed.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    }
++  ],
++  "rows": [
++    {
++      "id": "Y01",
++      "group": "cosmetic",
++      "label": "low",
++      "rationale": "Wording edit.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y02",
++      "group": "interface",
++      "label": "medium",
++      "rationale": "Default page size raised; maximum unchanged.",
++      "pred": "medium",
++      "reason": "field 'limit' default changed",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y03",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Expanded access: one workspace -> any workspace in the organization.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y04",
++      "group": "interface",
++      "label": "medium",
++      "rationale": "Reports additional usage data (token totals).",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y05",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Prepare-only tool now delivers externally.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y06",
++      "group": "interface",
++      "label": "medium",
++      "rationale": "Single date replaced by required start/end range.",
++      "pred": "medium",
++      "reason": "input field 'date' removed; new input field 'end_date'; new input field 'start_date'",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y07",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Reversible archive becomes permanent removal.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y08",
++      "group": "noop",
++      "label": "none",
++      "rationale": "Top-level schema keys reordered only.",
++      "pred": "none",
++      "reason": "no change after canonicalization",
++      "raw_flag": true,
++      "canon_flag": false
++    },
++    {
++      "id": "Y09",
++      "group": "interface",
++      "label": "medium",
++      "rationale": "Output timezone changes from local to UTC.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y10",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Preview-only tool now applies a refund (financial side effect).",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y11",
++      "group": "cosmetic",
++      "label": "low",
++      "rationale": "Spelling fix.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y12",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Expanded access to any project, including private ones.",
++      "pred": "low",
++      "reason": "wording change in field 'ticket_id' description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y13",
++      "group": "interface",
++      "label": "medium",
++      "rationale": "Result ordering reversed.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y14",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Default export now includes personal email and mobile number.",
++      "pred": "medium",
++      "reason": "field 'fields' default changed",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y15",
++      "group": "cosmetic",
++      "label": "low",
++      "rationale": "Prose formatting (paragraph break removed).",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y16",
++      "group": "interface",
++      "label": "medium",
++      "rationale": "New category from the same approved public catalog.",
++      "pred": "medium",
++      "reason": "field 'category' enum changed",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y17",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Default visibility widened from team to public.",
++      "pred": "medium",
++      "reason": "field 'visibility' default changed",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y18",
++      "group": "interface",
++      "label": "medium",
++      "rationale": "New output format; same inputs.",
++      "pred": "medium",
++      "reason": "field 'format' enum changed",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y19",
++      "group": "sensitive",
++      "label": "high",
++      "rationale": "Aggregate headcount becomes individual compensation data.",
++      "pred": "low",
++      "reason": "wording change in tool description",
++      "raw_flag": true,
++      "canon_flag": true
++    },
++    {
++      "id": "Y20",
++      "group": "noop",
++      "label": "none",
++      "rationale": "Same schema, serialized compact instead of indented (identical once parsed).",
++      "pred": "none",
++      "reason": "no change after canonicalization",
++      "raw_flag": false,
++      "canon_flag": false
++    }
++  ]
++}
+\ No newline at end of file
+diff --git a/bench/results/v2/heldout2.md b/bench/results/v2/heldout2.md
+new file mode 100644
+index 0000000..a2b1ac7
+--- /dev/null
++++ b/bench/results/v2/heldout2.md
+@@ -0,0 +1,76 @@
++# Results: `heldout2` (20 cases)
++
++Labels: high 8, low 3, medium 7, none 2
++
++## Approval gate (must never weaken)
++
++| | raw hash | canonical hash | watchdog |
++|---|---|---|---|
++| Changes that need review but were not flagged | 0 | 0 | 0 |
++| Formatting-only changes flagged (of 2) | 1 | 0 | 0 |
++
++## Prioritization
++
++- **Sensitive changes ranked high: 0 of 8**
++- **Routine changes (low/medium) wrongly ranked high: 0 of 10**
++- Exact label match: 9 of 20
++- Review queue, top 8 slots: watchdog puts 3.0 sensitive changes there; a hash-only queue (all changes equal, random order) puts 3.56 there on average.
++
++## Confusion (label -> predicted)
++
++| label | none | low | medium | high |
++|---|---|---|---|---|
++| none | 2 | 0 | 0 | 0 |
++| low | 0 | 3 | 0 | 0 |
++| medium | 0 | 3 | 4 | 0 |
++| high | 0 | 6 | 2 | 0 |
++
++## Sensitive changes ranked too low (8)
++
++| id | group | label | predicted | case | watchdog's reason |
++|---|---|---|---|---|---|
++| Y03 | sensitive | high | low | Expanded access: one workspace -> any workspace in the organization. | wording change in tool description |
++| Y05 | sensitive | high | low | Prepare-only tool now delivers externally. | wording change in tool description |
++| Y07 | sensitive | high | low | Reversible archive becomes permanent removal. | wording change in tool description |
++| Y10 | sensitive | high | low | Preview-only tool now applies a refund (financial side effect). | wording change in tool description |
++| Y12 | sensitive | high | low | Expanded access to any project, including private ones. | wording change in field 'ticket_id' description |
++| Y14 | sensitive | high | medium | Default export now includes personal email and mobile number. | field 'fields' default changed |
++| Y17 | sensitive | high | medium | Default visibility widened from team to public. | field 'visibility' default changed |
++| Y19 | sensitive | high | low | Aggregate headcount becomes individual compensation data. | wording change in tool description |
++
++## Routine changes ranked as urgent (0)
++
++None.
++
++## Other label mismatches (3)
++
++| id | group | label | predicted | case | watchdog's reason |
++|---|---|---|---|---|---|
++| Y04 | interface | medium | low | Reports additional usage data (token totals). | wording change in tool description |
++| Y09 | interface | medium | low | Output timezone changes from local to UTC. | wording change in tool description |
++| Y13 | interface | medium | low | Result ordering reversed. | wording change in tool description |
++
++## All cases (20)
++
++| id | group | label | predicted | case | watchdog's reason |
++|---|---|---|---|---|---|
++| Y01 | cosmetic | low | low | Wording edit. | wording change in tool description |
++| Y02 | interface | medium | medium | Default page size raised; maximum unchanged. | field 'limit' default changed |
++| Y03 | sensitive | high | low | Expanded access: one workspace -> any workspace in the organization. | wording change in tool description |
++| Y04 | interface | medium | low | Reports additional usage data (token totals). | wording change in tool description |
++| Y05 | sensitive | high | low | Prepare-only tool now delivers externally. | wording change in tool description |
++| Y06 | interface | medium | medium | Single date replaced by required start/end range. | input field 'date' removed; new input field 'end_date'; new input field 'start_date' |
++| Y07 | sensitive | high | low | Reversible archive becomes permanent removal. | wording change in tool description |
++| Y08 | noop | none | none | Top-level schema keys reordered only. | no change after canonicalization |
++| Y09 | interface | medium | low | Output timezone changes from local to UTC. | wording change in tool description |
++| Y10 | sensitive | high | low | Preview-only tool now applies a refund (financial side effect). | wording change in tool description |
++| Y11 | cosmetic | low | low | Spelling fix. | wording change in tool description |
++| Y12 | sensitive | high | low | Expanded access to any project, including private ones. | wording change in field 'ticket_id' description |
++| Y13 | interface | medium | low | Result ordering reversed. | wording change in tool description |
++| Y14 | sensitive | high | medium | Default export now includes personal email and mobile number. | field 'fields' default changed |
++| Y15 | cosmetic | low | low | Prose formatting (paragraph break removed). | wording change in tool description |
++| Y16 | interface | medium | medium | New category from the same approved public catalog. | field 'category' enum changed |
++| Y17 | sensitive | high | medium | Default visibility widened from team to public. | field 'visibility' default changed |
++| Y18 | interface | medium | medium | New output format; same inputs. | field 'format' enum changed |
++| Y19 | sensitive | high | low | Aggregate headcount becomes individual compensation data. | wording change in tool description |
++| Y20 | noop | none | none | Same schema, serialized compact instead of indented (identical once parsed). | no change after canonicalization |
+diff --git a/tests/test_priority.py b/tests/test_priority.py
+index 12d9c16..ef83252 100644
+--- a/tests/test_priority.py
++++ b/tests/test_priority.py
+@@ -45,7 +45,7 @@ def test_new_benign_tool_is_medium():
+     assert assess_new_tool(tool).priority is Priority.MEDIUM
+ 
+ 
+-@pytest.mark.parametrize("case_set", ["dev", "heldout"])
++@pytest.mark.parametrize("case_set", ["dev", "heldout", "heldout2"])
+ def test_benchmark_gate_never_weakened(case_set):
+     """Whatever the priority, no change that needs review may be classed as 'none'."""
+     m = evaluate(ROOT / "bench" / "cases" / f"{case_set}.json")
