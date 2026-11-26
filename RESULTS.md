@@ -2,7 +2,12 @@
 
 **Question:** Can we put the riskiest MCP tool changes at the top of the review queue without weakening the approval gate?
 
-**Short answer:** On 22 held-out tool changes, written after the rules were frozen, Watchdog ranked **7 of 9** sensitive changes as high priority and wrongly marked **2 of 11** routine changes as urgent. It never let a change skip review. In a review queue, the top 9 slots held 7 sensitive changes, compared with about 4 for a hash-only alert that treats every change equally.
+There are two versions of the rules:
+
+- **v1** was evaluated on an unseen held-out set. Those are the honest numbers below.
+- **v2** fixes the five v1 failures. It has **not** been evaluated on unseen cases yet: the v1 held-out cases were used to make the fixes, so they no longer count as a test. See [v2](#v2-fixing-the-v1-failures).
+
+**Short answer (v1):** On 22 held-out tool changes, written after the rules were frozen, Watchdog ranked **7 of 9** sensitive changes as high priority and wrongly marked **2 of 11** routine changes as urgent. It never let a change skip review. In a review queue, the top 9 slots held 7 sensitive changes, compared with about 4 for a hash-only alert that treats every change equally.
 
 These are small, self-written case sets. Read the numbers as a first measurement, not a benchmark score.
 
@@ -23,7 +28,7 @@ Three reviewers of the same changes:
 - **Canonical hash:** SHA-256 after canonicalization (sorted keys, `required` as a set). This is the hash-pinning approach used by tools like mcp-scan. Flagged changes all have equal priority.
 - **Watchdog:** canonical diff plus explainable rules that assign high, medium or low priority with a one-line reason.
 
-**Process.** The 40 dev cases and their labels were written before any rule existed. The rules were then developed against the dev set, which is why dev scores are perfect and say little. The rule files were hashed ([`bench/FROZEN_RULES.sha256`](bench/FROZEN_RULES.sha256)), and only then were the 22 held-out cases written, on 6 new tools, including cases where sensitive-looking words are used legitimately. No rule changed after the held-out run.
+**Process.** The 40 dev cases and their labels were written before any rule existed. The rules were then developed against the dev set, which is why dev scores are perfect and say little. The rule files were hashed ([`bench/FROZEN_RULES_v1.sha256`](bench/FROZEN_RULES_v1.sha256)), and only then were the 22 held-out cases written, on 6 new tools, including cases where sensitive-looking words are used legitimately. No rule changed after the held-out run.
 
 ## Results
 
@@ -38,9 +43,9 @@ Three reviewers of the same changes:
 
 The hash-only figure is the expected count when all changes share one priority and are reviewed in random order.
 
-Full per-case tables: [`bench/results/heldout.md`](bench/results/heldout.md), [`bench/results/dev.md`](bench/results/dev.md).
+Full per-case tables: [`bench/results/v1/heldout.md`](bench/results/v1/heldout.md), [`bench/results/v1/dev.md`](bench/results/v1/dev.md).
 
-## Where the rules failed (held-out)
+## Where the v1 rules failed (held-out)
 
 **Sensitive changes ranked too low:**
 
@@ -64,6 +69,27 @@ Full per-case tables: [`bench/results/heldout.md`](bench/results/heldout.md), [`
 - **Canonicalization matters on its own.** A raw-bytes hash flags every formatting-only change. A canonical hash flags none of them, and neither does Watchdog.
 - **Keyword rules are brittle in both directions:** capability changes described only in prose (H14), novel phrasings (H21), and sensitive words in benign contexts (H04, H11). The next step is an LLM-based classifier, measured on the same held-out set against these rules.
 
+## v2: fixing the v1 failures
+
+Each fix targets the general cause of a failure, not the exact wording of the case:
+
+| v1 failure | v2 change in `priority.py` |
+|---|---|
+| H14: write/delete capability described only in prose | New text mentioning `update`, `delete`, `drop`, `insert`, `truncate`, `overwrite` or `alter` is high. "any SQL / statement / command / table / record" counts as scope-broadening. |
+| H21: instruction in an HTML comment | Added HTML comments (`<!--`) are high (hidden from human readers, visible to the model). Text addressed to the model (`assistant:`, "note to the AI") is treated as an instruction. |
+| H04: "tokens" flagged as secrets | Bare "token(s)" no longer counts. Only qualified forms do: API, access, auth, bearer, personal, GitHub, session, refresh or OAuth token. |
+| H11: benign `filename` field flagged | Field-name words are split into **strong** (`password`, `cmd`, `callback_url`, …), which are always high, and **weak** (`file`, `path`, `key`, `session`, …), which are high only if the field's own text points at local files (`local`, `absolute`, `~/`, `/etc/`, "on this machine"), otherwise medium with a "check it" reason. |
+| H19: right answer, wrong reason | The look-alike rule now flags only letters from scripts that imitate Latin (Cyrillic, Greek, …). Accented Latin (é, í, ñ) is ordinary text. A new rule flags email addresses in added prose as an outside destination, so H19 is now caught for the right reason. |
+
+**Checks:**
+- **No regressions on dev.** All 40 dev cases are still classified correctly ([`bench/results/v2/dev.md`](bench/results/v2/dev.md)).
+- **The five v1 failures are now handled**, each for the stated reason. These are regression tests in `tests/test_priority.py`. That proves the fixes work on those cases, and nothing more: the v1 held-out set scores 22/22 under v2 ([`heldout_SEEN_not_a_test.md`](bench/results/v2/heldout_SEEN_not_a_test.md)), but those cases were used to write the fixes.
+- **v2 rules are frozen** in [`bench/FROZEN_RULES_v2.sha256`](bench/FROZEN_RULES_v2.sha256).
+
+**Next:** evaluate v2 on a new held-out set (`bench/build_heldout2_cases.py`), ideally written by someone who hasn't read the rules. Until then, the only valid unseen-case result is the v1 result above.
+
+**Likely new weaknesses in v2:** the write/delete vocabulary will fire on legitimate descriptions that newly mention, say, "delete" for a tool that always could delete. The strong/weak split will under-rank a weak-named field whose danger is only implied (e.g. `path` with no description).
+
 ## Threats to validity
 
 - **One author** wrote the rules and both case sets. A held-out set written by someone who hasn't read `priority.py` would be a stronger test.
@@ -76,8 +102,12 @@ Full per-case tables: [`bench/results/heldout.md`](bench/results/heldout.md), [`
 ```bash
 pip install -e ".[dev]"
 python bench/build_dev_cases.py && python bench/build_heldout_cases.py
-python bench/evaluate.py bench/cases/dev.json
-python bench/evaluate.py bench/cases/heldout.json
-sha256sum -c bench/FROZEN_RULES.sha256
+python bench/evaluate.py bench/cases/dev.json          # v2 rules, writes bench/results/v2
+shasum -a 256 -c bench/FROZEN_RULES_v2.sha256        # macOS (Linux: sha256sum -c)
+
+# Verify the v1 numbers: the v1 rules are in the first commit (e2690e4)
+git worktree add /tmp/watchdog-v1 e2690e4
+(cd /tmp/watchdog-v1 && shasum -a 256 -c bench/FROZEN_RULES.sha256 && python bench/evaluate.py bench/cases/heldout.json)  # 7/9, 2/11
+git worktree remove --force /tmp/watchdog-v1
 pytest -q
 ```

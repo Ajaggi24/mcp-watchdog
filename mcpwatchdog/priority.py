@@ -7,6 +7,8 @@ Rules are deliberately simple and explainable. Each rule looks only at what
 was *added or changed*, so text that was already in an approved definition
 does not raise the priority again.
 
+  (v2 changes are marked "v2" in comments; see RESULTS.md for why each was made.)
+
   high    sensitive field names, sensitive text (credentials, local paths,
           shell commands, outbound URLs), instruction-like text aimed at the
           model, scope-broadening wording, safety-annotation escalation,
@@ -65,25 +67,41 @@ class Assessment:
 
 
 # ---------------------------------------------------------------- vocab
-SENSITIVE_NAME_TOKENS = {
-    "file", "filepath", "filename", "path", "dir", "directory", "folder",
+# Field-name words that are sensitive on their own (v2: split into strong and weak).
+STRONG_NAME_TOKENS = {
     "credential", "credentials", "secret", "secrets", "token", "password", "passwd",
-    "apikey", "key", "ssh", "cookie", "cookies", "session", "env",
-    "command", "cmd", "shell", "exec", "script", "eval",
-    "url", "uri", "webhook", "callback", "endpoint", "bcc", "forward", "upload",
+    "apikey", "ssh", "cookie", "cookies",
+    "command", "cmd", "shell", "exec", "eval",
+    "url", "uri", "webhook", "callback", "endpoint", "bcc",
 }
+# Field-name words that are often benign ("filename" of a wiki page, "session" of a chat).
+# They escalate to high only when the field's own text or default also points at
+# local files or secrets; otherwise they are medium with a "check this" reason.
+WEAK_NAME_TOKENS = {
+    "file", "filepath", "filename", "path", "dir", "directory", "folder",
+    "key", "session", "env", "script", "forward", "upload",
+}
+SENSITIVE_NAME_TOKENS = STRONG_NAME_TOKENS | WEAK_NAME_TOKENS
+
+LOCAL_TEXT = re.compile(
+    r"\blocal\b|\bdisk\b|\babsolute\b|~/|/etc/|/home/|/users/|file ?system|"
+    r"\bon (this|the) (machine|host|computer)\b|\bhome directory\b", re.I)
 
 SENSITIVE_TEXT = [
     (r"~/|/etc/|/home/|/users/|\bc:\\", "a local filesystem path"),
     (r"\.ssh\b|\bssh keys?\b|\bid_rsa\b|\bid_ed25519\b", "SSH keys"),
     (r"\.aws\b|\bcredentials?\b|\.kube\b|kubeconfig", "credentials"),
     (r"\.env\b|\benvironment variables?\b", "environment secrets"),
-    (r"\bpasswords?\b|\bapi[ _-]?keys?\b|\bsecrets?\b|\bprivate keys?\b|\b(access|auth|bearer|personal) tokens?\b|\btokens?\b",
+    (r"\bpasswords?\b|\bapi[ _-]?keys?\b|\bsecrets?\b|\bprivate keys?\b|\b(access|auth|bearer|personal|api|github|session|refresh|oauth) tokens?\b",
      "secrets or tokens"),
     (r"\bshell\b|\bbash\b|\bexecute\b|\brun (a |the )?(shell )?commands?\b|\bstdout\b", "command execution"),
     (r"https?://|\bpost (it|them|the result|results)\b|\bsend (it|them|this|the result|results) to\b|\bupload\b",
      "sending data to an outside endpoint"),
     (r"\bcontents of\b|\bbash_history\b|\bshell history\b", "reading local file contents"),
+    # v2: an email address in prose is a destination the model might send data to (H19)
+    (r"[\w.+-]+@[\w-]+(\.[\w-]+)*\.[a-z]{2,}", "an outside email address"),
+    # v2: write/delete capability described in prose (H14)
+    (r"\b(update|delete|drop|insert|truncate|overwrite|alter)\b", "write or delete capability"),
 ]
 
 INSTRUCTION_TEXT = [
@@ -91,12 +109,19 @@ INSTRUCTION_TEXT = [
     r"\bdo not (tell|mention|inform|show|reveal)\b", r"\bwithout (telling|informing|asking)\b",
     r"\bbefore (using|calling|searching|reading|you)\b", r"\balways (append|include|pass|send|read|attach|add)\b",
     r"\byou must\b", r"\balso (pass|include|send|read|attach)\b", r"\bfirst (read|call|run|fetch)\b",
+    # v2: text addressed to the model rather than describing the tool (H21)
+    r"\b(note to (the )?)?(assistant|ai|model|llm|agent)\s*:", r"\bnote to (the )?(assistant|ai|model|llm|agent)\b",
 ]
+
+# v2: places a human reviewer is unlikely to read but the model still sees (H21)
+HIDDEN_TEXT = [r"<!--", r"\[//\]: #"]
 
 SCOPE_TEXT = [
     r"\bany (file|files|document|documents|path|folder|domain|address|recipient|url)\b",
     r"\bon (this|the) (machine|host|computer|disk|system)\b", r"\banywhere\b",
     r"\b(outside|external|any) domains?\b", r"\ball files\b",
+    # v2: "any SQL statement", "any command" (H14)
+    r"\bany (sql|statements?|query|queries|commands?|tables?|records?|operations?)\b",
 ]
 
 _TEXT_KEYS = ("description", "title")
@@ -133,16 +158,25 @@ def _added_text(old: str, new: str) -> str:
     return " ".join(w for w in new.split() if w not in old_words)
 
 
+_CONFUSABLE_SCRIPTS = ("CYRILLIC", "GREEK", "ARMENIAN", "CHEROKEE", "COPTIC", "FULLWIDTH", "MATHEMATICAL")
+
+
+def _is_confusable(ch: str) -> bool:
+    return ord(ch) >= 128 and unicodedata.name(ch, "").startswith(_CONFUSABLE_SCRIPTS)
+
+
 def _obfuscation(old: str, new: str) -> str | None:
     def invisible(s: str) -> set[str]:
         return {ch for ch in s if unicodedata.category(ch) in ("Cf", "Co", "Cs")}
 
     def lookalike(s: str) -> set[str]:
+        # v2: only scripts that imitate Latin letters count. Accented Latin letters
+        # (é, í, ñ) are ordinary text in many languages and are not flagged (H19).
         out = set()
         for word in re.findall(r"\w+", s):
             letters = [ch for ch in word if ch.isalpha()]
-            if any(ord(ch) < 128 for ch in letters) and any(ord(ch) >= 128 for ch in letters):
-                out |= {ch for ch in letters if ord(ch) >= 128}
+            if any(ord(ch) < 128 for ch in letters):
+                out |= {ch for ch in letters if _is_confusable(ch)}
         return out
 
     if invisible(new) - invisible(old):
@@ -162,6 +196,10 @@ def _scan_text(text: str, where: str, a: Assessment) -> None:
         if re.search(pattern, low):
             a.add(Finding(Priority.HIGH, f"{where} now contains instructions aimed at the model", where))
             break
+    for pattern in HIDDEN_TEXT:
+        if re.search(pattern, low):
+            a.add(Finding(Priority.HIGH, f"{where} now contains hidden comment text", where))
+            break
     for pattern in SCOPE_TEXT:
         if re.search(pattern, low):
             a.add(Finding(Priority.HIGH, f"{where} broadens the tool's scope", where))
@@ -173,9 +211,15 @@ def _scan_text(text: str, where: str, a: Assessment) -> None:
 
 
 def _scan_new_property(name: str, schema: Any, path: str, a: Assessment) -> None:
-    hits = _name_tokens(name) & SENSITIVE_NAME_TOKENS
-    if hits:
-        a.add(Finding(Priority.HIGH, f"new field '{name}' suggests {sorted(hits)[0]} access", path))
+    tokens = _name_tokens(name)
+    strong, weak = tokens & STRONG_NAME_TOKENS, tokens & WEAK_NAME_TOKENS
+    if strong:
+        a.add(Finding(Priority.HIGH, f"new field '{name}' suggests {sorted(strong)[0]} access", path))
+    elif weak:
+        if any(LOCAL_TEXT.search(s) for s in _strings(schema)):
+            a.add(Finding(Priority.HIGH, f"new field '{name}' suggests local {sorted(weak)[0]} access", path))
+        else:
+            a.add(Finding(Priority.MEDIUM, f"new field '{name}' mentions {sorted(weak)[0]}; description looks benign, check it", path))
     for s in _strings(schema):
         _scan_text(s, f"new field '{name}'", a)
     if isinstance(schema, dict) and isinstance(schema.get("default"), str) and _EMAIL_OR_URL.search(schema["default"]):
@@ -261,9 +305,10 @@ def assess_changes(changes: list[Change]) -> Assessment:
 def assess_new_tool(tool: dict[str, Any]) -> Assessment:
     a = Assessment()
     a.add(Finding(Priority.MEDIUM, "new tool, never reviewed"))
-    hits = _name_tokens(tool["name"]) & SENSITIVE_NAME_TOKENS
-    if hits:
-        a.add(Finding(Priority.HIGH, f"new tool name suggests {sorted(hits)[0]} access", "name"))
+    tokens = _name_tokens(tool["name"])
+    strong, weak = tokens & STRONG_NAME_TOKENS, tokens & WEAK_NAME_TOKENS
+    if strong or (weak and LOCAL_TEXT.search(tool.get("description") or "")):
+        a.add(Finding(Priority.HIGH, f"new tool name suggests {sorted(strong or weak)[0]} access", "name"))
     for text in (tool.get("description") or "", tool.get("title") or ""):
         _scan_text(text, "new tool's description", a)
         if (why := _obfuscation("", text)):

@@ -6,7 +6,7 @@ An AI agent's tool definition can change after a developer approves it. A change
 
 ![demo](demo/watchdog_demo.gif)
 
-**Results on 22 held-out tool changes (rules frozen before the cases were written):** 7 of 9 sensitive changes were ranked high priority, 2 of 11 routine changes were wrongly ranked urgent, and 0 changes skipped review. The top 9 slots of the review queue held 7 sensitive changes, compared with about 4 for a hash-only alert. See [RESULTS.md](RESULTS.md), including the cases the rules got wrong.
+**Results (v1 rules, 22 held-out tool changes written after the rules were frozen):** 7 of 9 sensitive changes were ranked high priority, 2 of 11 routine changes were wrongly ranked urgent, and 0 changes skipped review. The top 9 slots of the review queue held 7 sensitive changes, compared with about 4 for a hash-only alert. The v2 rules fix all five v1 failures with no regressions on the dev set, and are frozen pending a new held-out evaluation. See [RESULTS.md](RESULTS.md).
 
 ## Why now
 
@@ -28,7 +28,7 @@ OWASP's Q3 2026 GenAI exploit roundup describes an MCP server that behaved norma
 pip install -e ".[dev]"
 python demo/live_demo.py          # the scripted demo
 python demo/live_demo.py --step   # press Enter between scenes, for recording
-pytest -q                         # 19 tests, including live stdio sessions
+pytest -q                         # 25 tests, including live stdio sessions
 ```
 
 ## CLI
@@ -70,7 +70,7 @@ async with connect("python my_server.py", ApprovalStore()) as g:
 
 ## Benchmark
 
-[`bench/`](bench/) contains 62 labeled tool-definition changes (40 dev, 22 held-out) as JSON, an evaluator that compares Watchdog with raw-hash and canonical-hash baselines, and the generated results. The dataset is tool-agnostic, so you can run your own prioritizer against it.
+[`bench/`](bench/) contains 62 labeled tool-definition changes (40 dev, 22 v1 held-out) as JSON, a template for a new held-out set, an evaluator that compares Watchdog with raw-hash and canonical-hash baselines, and the generated results. The dataset is tool-agnostic, so you can run your own prioritizer against it.
 
 ## Project layout
 

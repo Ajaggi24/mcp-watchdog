@@ -2,6 +2,8 @@
 
     python bench/evaluate.py bench/cases/dev.json
     python bench/evaluate.py bench/cases/heldout.json
+    python bench/evaluate.py bench/cases/heldout2.json      # your own held-out set
+    python bench/evaluate.py <cases.json> <output-dir>      # default output: bench/results/v2
 
 Compares three reviewers of the same tool-definition changes:
 
@@ -11,7 +13,7 @@ Compares three reviewers of the same tool-definition changes:
                   such as mcp-scan do). All flagged changes at equal priority.
   watchdog        canonical diff + rule-based priority (high / medium / low).
 
-Writes bench/results/<set>.md and <set>.json.
+Writes <output-dir>/<set>.md and <set>.json.
 """
 
 from __future__ import annotations
@@ -157,8 +159,8 @@ def to_markdown(m: dict) -> str:
 if __name__ == "__main__":
     path = Path(sys.argv[1] if len(sys.argv) > 1 else ROOT / "bench" / "cases" / "dev.json")
     m = evaluate(path)
-    out = ROOT / "bench" / "results"
-    out.mkdir(exist_ok=True)
+    out = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "bench" / "results" / "v2"
+    out.mkdir(parents=True, exist_ok=True)
     (out / f"{m['set']}.md").write_text(to_markdown(m), encoding="utf-8")
     (out / f"{m['set']}.json").write_text(json.dumps({k: v for k, v in m.items()}, indent=2, ensure_ascii=False), encoding="utf-8")
     p, q, g = m["priority"], m["queue"], m["gate"]

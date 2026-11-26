@@ -39,7 +39,7 @@ def reveal(text: str) -> str:
             out.append({"\n": "\\n", "\t": "\\t"}[ch])
         elif cat in ("Cf", "Cc", "Zl", "Zp") or (cat == "Zs" and ch != " "):
             out.append(f"<U+{ord(ch):04X}>")
-        elif ord(ch) > 127 and cat.startswith("L"):
+        elif ord(ch) > 127 and cat.startswith("L") and not unicodedata.name(ch, "").startswith("LATIN"):
             out.append(f"{ch}<U+{ord(ch):04X}>")
         else:
             out.append(ch)

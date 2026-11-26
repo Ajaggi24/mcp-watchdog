@@ -23,8 +23,18 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parents[1]
 W, H = 1280, 720
 PAD_X, TOP = 36, 64
-FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
-BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+def _first_font(*paths: str) -> str:
+    for p in paths:
+        if Path(p).exists():
+            return p
+    raise SystemExit("No monospace font found; set FONT_PATH in demo/make_video.py")
+
+
+FONT_PATH = _first_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",   # Linux
+                        "/System/Library/Fonts/Menlo.ttc",                         # macOS
+                        "C:/Windows/Fonts/consola.ttf")                            # Windows
+BOLD_PATH = _first_font("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
+                        "/System/Library/Fonts/Menlo.ttc", "C:/Windows/Fonts/consolab.ttf")
 SIZE, LINE_H = 17, 25
 BG, BAR, FG, DIMC = (15, 17, 21), (30, 33, 41), (230, 232, 238), (120, 128, 145)
 COLORS = {"31": (255, 93, 93), "32": (76, 208, 138), "33": (245, 185, 66), "36": (79, 195, 217)}
@@ -112,7 +122,7 @@ def main() -> None:
     out = subprocess.run([sys.executable, str(ROOT / "demo" / "live_demo.py")], capture_output=True, text=True,
                          env=env, check=True, timeout=120).stdout.splitlines()
 
-    held = json.loads((ROOT / "bench" / "results" / "heldout.json").read_text())
+    held = json.loads((ROOT / "bench" / "results" / "v1" / "heldout.json").read_text())
     p, q = held["priority"], held["queue"]
 
     shots: list[tuple[Image.Image, float]] = []
@@ -140,7 +150,7 @@ def main() -> None:
                 hold = 1.2
             shots.append((frame(screen), hold))
     shots.append((frame(screen), 3.0))
-    shots.append((card("Held-out benchmark (22 cases, rules frozen)", [
+    shots.append((card("v1 held-out benchmark (22 unseen cases)", [
         f"Sensitive changes ranked high: {p['high_ranked_high']} of {p['n_high']}",
         f"Routine changes wrongly ranked urgent: {p['routine_ranked_high']} of {p['n_routine']}",
         f"Top {q['k']} of the review queue: {q['watchdog_high_in_top_k']:g} sensitive vs {q['hash_high_in_top_k_expected']:g} with hash-only",

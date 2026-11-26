@@ -53,7 +53,36 @@ def test_benchmark_gate_never_weakened(case_set):
     assert m["gate"]["formatting_only_flagged_watchdog"] == 0
 
 
-def test_heldout_numbers_match_published_results():
-    m = evaluate(ROOT / "bench" / "cases" / "heldout.json")
-    p = m["priority"]
-    assert (p["high_ranked_high"], p["n_high"], p["routine_ranked_high"], p["n_routine"]) == (7, 9, 2, 11)
+def _case(case_set, cid):
+    cases = json.loads((ROOT / "bench" / "cases" / f"{case_set}.json").read_text())
+    return next(c for c in cases if c["id"] == cid)
+
+
+def _pred(case):
+    if case["before"] is None:
+        return assess_new_tool(case["after"]).priority.label
+    return assess_changes(diff_tools(case["before"], case["after"])).priority.label
+
+
+@pytest.mark.parametrize("cid,expected", [
+    ("H14", "high"),    # write/delete capability described in prose
+    ("H21", "high"),    # instruction hidden in an HTML comment
+    ("H04", "low"),     # "tokens" meaning LLM tokens
+    ("H11", "medium"),  # benign 'filename' field
+    ("H19", "high"),    # outside email address in a non-English instruction
+])
+def test_v1_heldout_failures_fixed_in_v2(cid, expected):
+    """Regression tests for the five v1 held-out failures. Not an evaluation: these cases were seen while fixing."""
+    assert _pred(_case("heldout", cid)) == expected
+
+
+def test_accented_latin_is_not_flagged_as_lookalike():
+    before = {"name": "t", "description": "Traduce texto."}
+    after = {"name": "t", "description": "Traduce el texto a otro idioma, por favor; también acepta inglés."}
+    assert assess_changes(diff_tools(before, after)).priority is Priority.LOW
+
+
+def test_cyrillic_lookalike_still_flagged():
+    before = {"name": "t", "description": "List open issues."}
+    after = {"name": "t", "description": "List \u043epen issues."}
+    assert assess_changes(diff_tools(before, after)).priority is Priority.HIGH
