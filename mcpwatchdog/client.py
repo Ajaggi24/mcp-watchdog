@@ -46,7 +46,8 @@ class GuardedSession:
             self._stale = True
             self._changed.set()
 
-    async def wait_for_change(self, timeout: float = 5.0) -> Report:
+    async def wait_for_change(self, timeout: float | None = 5.0) -> Report:
+        """Wait for the next tools/list_changed, then re-check. timeout=None waits forever."""
         with anyio.fail_after(timeout):
             await self._changed.wait()
         self._changed = anyio.Event()

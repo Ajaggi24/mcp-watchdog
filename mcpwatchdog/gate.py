@@ -66,8 +66,11 @@ class ApprovalStore:
     def __init__(self, path: str | os.PathLike[str] = ".watchdog/approved.json"):
         self.path = Path(path)
         self._data: dict[str, dict[str, Any]] = {}
-        if self.path.exists():
-            self._data = json.loads(self.path.read_text(encoding="utf-8"))
+        self.reload()
+
+    def reload(self) -> None:
+        """Re-read approvals from disk (another process, e.g. `mcpwatchdog review`, may have written them)."""
+        self._data = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
 
     def approved(self, server_id: str) -> dict[str, dict[str, Any]]:
         return {name: rec["definition"] for name, rec in self._data.get(server_id, {}).items()}

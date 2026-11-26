@@ -30,7 +30,7 @@ OWASP's Q3 2026 GenAI exploit roundup describes an MCP server that behaved norma
 pip install -e ".[dev]"
 python demo/live_demo.py          # the scripted demo
 python demo/live_demo.py --step   # press Enter between scenes, for recording
-pytest -q                         # 25 tests, including live stdio sessions (also run by CI on every push)
+pytest -q                         # 26 tests, including live stdio sessions and the proxy (also run by CI on every push)
 ```
 
 ## CLI
@@ -41,9 +41,52 @@ python -m mcpwatchdog approve --server "$S"                 # snapshot all tools
 python -m mcpwatchdog check   --server "$S"                 # exit 1 if anything needs review (CI gate)
 python -m mcpwatchdog check   --server "$S" --html out.html # plus a visual review page
 python -m mcpwatchdog review  --server "$S"                 # approve pending tools one by one, most urgent first
+python -m mcpwatchdog proxy   --server "$S"                 # run in front of a real host (see below)
 ```
 
 Approvals are stored in `.watchdog/approved.json`, keyed by server name.
+
+## Use it with Claude Code or Cursor (proxy mode)
+
+`mcpwatchdog proxy` sits between a real MCP host and the server it would normally launch. The host starts the proxy, and the proxy starts the real server.
+
+- **Only approved tools are listed to the host.** A changed or new tool is withheld entirely, so the model never reads the unapproved description, not just never calls it.
+- **Calls to withheld tools are refused** with an error saying review is needed.
+- **Mid-session changes are forwarded** to the host as `tools/list_changed`.
+- **Approvals take effect live.** Approve in another terminal and the tools reappear without restarting the host.
+- **Every check is logged** to stderr, and a review page is written to `--html` (default `.watchdog/review.html`).
+
+Use absolute paths, because the host may start the proxy from any directory:
+
+```bash
+PY=/absolute/path/to/mcp-watchdog/.venv/bin/python
+SERVER="python /absolute/path/to/your_server.py"
+STORE=/absolute/path/to/mcp-watchdog/.watchdog/approved.json
+
+# 1. Review and approve the server's tools once
+$PY -m mcpwatchdog approve --server "$SERVER" --store "$STORE"
+
+# 2a. Claude Code
+claude mcp add --transport stdio notes -- "$PY" -m mcpwatchdog proxy --server "$SERVER" --store "$STORE"
+```
+
+```json
+// 2b. Cursor: .cursor/mcp.json (or ~/.cursor/mcp.json)
+{
+  "mcpServers": {
+    "notes": {
+      "command": "/absolute/path/to/mcp-watchdog/.venv/bin/python",
+      "args": ["-m", "mcpwatchdog", "proxy",
+               "--server", "python /absolute/path/to/your_server.py",
+               "--store", "/absolute/path/to/mcp-watchdog/.watchdog/approved.json"]
+    }
+  }
+}
+```
+
+When a tool changes, it disappears from the host until you run `review` (or `approve`) with the same `--server` and `--store`.
+
+The proxy is covered by an end-to-end test (`tests/test_proxy.py`) that uses a plain MCP client in place of the host. The Claude Code and Cursor configurations above follow each tool's documented format, but this repo doesn't test them automatically.
 
 ## Use it in your own client
 
@@ -83,6 +126,7 @@ async with connect("python my_server.py", ApprovalStore()) as g:
 | `mcpwatchdog/priority.py` | review priority + reasons |
 | `mcpwatchdog/gate.py` | approval store, per-tool status, review queue, call gate |
 | `mcpwatchdog/client.py` | wraps the MCP SDK `ClientSession`; re-lists on `list_changed`; gates `call_tool` |
+| `mcpwatchdog/proxy.py` | stdio proxy for real hosts: withholds unapproved tools, forwards changes, reloads approvals |
 | `mcpwatchdog/html.py` | visual review page |
 | `demo_server/` | mock stdio MCP server that reloads its tools from a JSON file |
 | `demo/` | scripted live demo + video renderer |
@@ -91,7 +135,7 @@ async with connect("python my_server.py", ApprovalStore()) as g:
 ## Scope and limitations
 
 - **Definitions, not behavior.** A server can keep its metadata identical and still return malicious output (indirect prompt injection). Watchdog doesn't see that.
-- **Protects calls made through this client.** It doesn't cover Claude Code, Cursor and similar hosts unless it's placed in front of them as an MCP proxy (future work).
+- **Protects only traffic that goes through Watchdog,** either the client library or the proxy. A host connected to the server directly is not protected.
 - **A server that changes tools without sending `list_changed`** is caught at the next re-list or reconnect. Until then, the model keeps working from the definitions it was shown at approval.
 - **Keyword rules are brittle.** See the held-out misses in [RESULTS.md](RESULTS.md). An LLM classifier evaluated on the same held-out set is the obvious next step.
 
