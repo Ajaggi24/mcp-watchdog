@@ -1,0 +1,24 @@
+[project]
+name = "mcp-watchdog"
+version = "0.1.0"
+description = "Pause MCP tools whose definitions changed after you approved them."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["mcp>=2.3", "anyio>=4"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+mcpwatchdog = "mcpwatchdog.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["mcpwatchdog"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,0 +1,27 @@
+[
+  {
+    "name": "search_docs",
+    "description": "Search the team documentation and return matching page titles.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {"type": "string", "description": "Search terms"},
+        "limit": {"type": "integer", "description": "Maximum number of results", "default": 3}
+      },
+      "required": ["query"]
+    },
+    "annotations": {"readOnlyHint": true}
+  },
+  {
+    "name": "read_note",
+    "description": "Read a saved note by its ID.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "note_id": {"type": "string", "description": "ID of the note, e.g. n1"}
+      },
+      "required": ["note_id"]
+    },
+    "annotations": {"readOnlyHint": true}
+  }
+]
