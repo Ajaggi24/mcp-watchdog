@@ -30,14 +30,14 @@ jobs:
       - name: Evaluate on dev cases
         run: python bench/evaluate.py bench/cases/dev.json /tmp/results
 
-      - name: Approval gate never weakened (dev + v1 held-out)
+      - name: Approval gate never weakened (dev + both held-out sets)
         run: |
           python - <<'EOF'
           import sys
           sys.path.insert(0, "bench")
           from evaluate import evaluate
           from pathlib import Path
-          for name in ("dev", "heldout"):
+          for name in ("dev", "heldout", "heldout2"):
               m = evaluate(Path(f"bench/cases/{name}.json"))
               missed = m["gate"]["needs_review_missed_by_watchdog"]
               print(f"{name}: changes that skipped review = {missed}")

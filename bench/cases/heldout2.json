@@ -1,0 +1,609 @@
+[
+  {
+    "id": "Y01",
+    "group": "cosmetic",
+    "label": "low",
+    "rationale": "Wording edit.",
+    "before": {
+      "name": "get_weather",
+      "description": "Return the forecast for the selected city.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ]
+      }
+    },
+    "after": {
+      "name": "get_weather",
+      "description": "Show the forecast for the selected city.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ]
+      }
+    }
+  },
+  {
+    "id": "Y02",
+    "group": "interface",
+    "label": "medium",
+    "rationale": "Default page size raised; maximum unchanged.",
+    "before": {
+      "name": "list_projects",
+      "description": "List projects.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "maximum": 100
+          }
+        }
+      }
+    },
+    "after": {
+      "name": "list_projects",
+      "description": "List projects.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "default": 50,
+            "maximum": 100
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "Y03",
+    "group": "sensitive",
+    "label": "high",
+    "rationale": "Expanded access: one workspace -> any workspace in the organization.",
+    "before": {
+      "name": "list_notes",
+      "description": "Return notes from the current workspace.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "after": {
+      "name": "list_notes",
+      "description": "Return notes from any workspace in the organization.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "id": "Y04",
+    "group": "interface",
+    "label": "medium",
+    "rationale": "Reports additional usage data (token totals).",
+    "before": {
+      "name": "get_usage_stats",
+      "description": "Report request counts by model.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "after": {
+      "name": "get_usage_stats",
+      "description": "Report request counts and input/output token totals by model.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "id": "Y05",
+    "group": "sensitive",
+    "label": "high",
+    "rationale": "Prepare-only tool now delivers externally.",
+    "before": {
+      "name": "draft_invoice",
+      "description": "Prepare an invoice for review.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "after": {
+      "name": "draft_invoice",
+      "description": "Prepare the invoice and deliver it to the saved billing contact.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "id": "Y06",
+    "group": "interface",
+    "label": "medium",
+    "rationale": "Single date replaced by required start/end range.",
+    "before": {
+      "name": "find_events",
+      "description": "Find events on a date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          }
+        },
+        "required": [
+          "date"
+        ]
+      }
+    },
+    "after": {
+      "name": "find_events",
+      "description": "Find events on a date.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "YYYY-MM-DD"
+          }
+        },
+        "required": [
+          "start_date",
+          "end_date"
+        ]
+      }
+    }
+  },
+  {
+    "id": "Y07",
+    "group": "sensitive",
+    "label": "high",
+    "rationale": "Reversible archive becomes permanent removal.",
+    "before": {
+      "name": "archive_task",
+      "description": "Move a task to the archive. It can be restored.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "after": {
+      "name": "archive_task",
+      "description": "Remove the task from both active and archived views. The action is permanent.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "id": "Y08",
+    "group": "noop",
+    "label": "none",
+    "rationale": "Top-level schema keys reordered only.",
+    "before": {
+      "name": "search_catalog",
+      "description": "Search the product catalog.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    "after": {
+      "name": "search_catalog",
+      "description": "Search the product catalog.",
+      "inputSchema": {
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    }
+  },
+  {
+    "id": "Y09",
+    "group": "interface",
+    "label": "medium",
+    "rationale": "Output timezone changes from local to UTC.",
+    "before": {
+      "name": "get_store_hours",
+      "description": "Return store hours in the store's local time.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "after": {
+      "name": "get_store_hours",
+      "description": "Return store hours in UTC.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "id": "Y10",
+    "group": "sensitive",
+    "label": "high",
+    "rationale": "Preview-only tool now applies a refund (financial side effect).",
+    "before": {
+      "name": "preview_refund",
+      "description": "Calculate the refund amount for an order.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "after": {
+      "name": "preview_refund",
+      "description": "Calculate the refund amount and apply it to the original payment method.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "id": "Y11",
+    "group": "cosmetic",
+    "label": "low",
+    "rationale": "Spelling fix.",
+    "before": {
+      "name": "find_manual",
+      "description": "Search product manuals by keywrod.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "after": {
+      "name": "find_manual",
+      "description": "Search product manuals by keyword.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "id": "Y12",
+    "group": "sensitive",
+    "label": "high",
+    "rationale": "Expanded access to any project, including private ones.",
+    "before": {
+      "name": "get_ticket",
+      "description": "Get a support ticket.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "description": "An ID from the current project."
+          }
+        },
+        "required": [
+          "ticket_id"
+        ]
+      }
+    },
+    "after": {
+      "name": "get_ticket",
+      "description": "Get a support ticket.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "description": "An ID from any project, including private projects."
+          }
+        },
+        "required": [
+          "ticket_id"
+        ]
+      }
+    }
+  },
+  {
+    "id": "Y13",
+    "group": "interface",
+    "label": "medium",
+    "rationale": "Result ordering reversed.",
+    "before": {
+      "name": "list_bookmarks",
+      "description": "List bookmarks. Results sort by created_at ascending.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "after": {
+      "name": "list_bookmarks",
+      "description": "List bookmarks. Results sort by created_at descending.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "id": "Y14",
+    "group": "sensitive",
+    "label": "high",
+    "rationale": "Default export now includes personal email and mobile number.",
+    "before": {
+      "name": "export_contacts",
+      "description": "Export contacts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "display_name"
+            ]
+          }
+        }
+      }
+    },
+    "after": {
+      "name": "export_contacts",
+      "description": "Export contacts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "display_name",
+              "personal_email",
+              "mobile_number"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "Y15",
+    "group": "cosmetic",
+    "label": "low",
+    "rationale": "Prose formatting (paragraph break removed).",
+    "before": {
+      "name": "get_release_notes",
+      "description": "Return notes for a release.\n\nIncludes bug fixes.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "after": {
+      "name": "get_release_notes",
+      "description": "Return notes for a release. Includes bug fixes.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "id": "Y16",
+    "group": "interface",
+    "label": "medium",
+    "rationale": "New category from the same approved public catalog.",
+    "before": {
+      "name": "search_assets",
+      "description": "Search approved public assets.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "images",
+              "videos"
+            ]
+          }
+        }
+      }
+    },
+    "after": {
+      "name": "search_assets",
+      "description": "Search approved public assets.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "images",
+              "videos",
+              "documents"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "Y17",
+    "group": "sensitive",
+    "label": "high",
+    "rationale": "Default visibility widened from team to public.",
+    "before": {
+      "name": "set_profile_visibility",
+      "description": "Set who can see the user's profile.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "team",
+              "public"
+            ],
+            "default": "team"
+          }
+        }
+      }
+    },
+    "after": {
+      "name": "set_profile_visibility",
+      "description": "Set who can see the user's profile.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "team",
+              "public"
+            ],
+            "default": "public"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "Y18",
+    "group": "interface",
+    "label": "medium",
+    "rationale": "New output format; same inputs.",
+    "before": {
+      "name": "format_report",
+      "description": "Format a report.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "html"
+            ]
+          }
+        }
+      }
+    },
+    "after": {
+      "name": "format_report",
+      "description": "Format a report.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "html",
+              "markdown"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "Y19",
+    "group": "sensitive",
+    "label": "high",
+    "rationale": "Aggregate headcount becomes individual compensation data.",
+    "before": {
+      "name": "get_team_summary",
+      "description": "Return total headcount per department.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "after": {
+      "name": "get_team_summary",
+      "description": "Return an employee roster with individual compensation alongside department headcounts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "id": "Y20",
+    "group": "noop",
+    "label": "none",
+    "rationale": "Same schema, serialized compact instead of indented (identical once parsed).",
+    "before": {
+      "name": "lookup_sku",
+      "description": "Look up a product by SKU.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku"
+        ]
+      }
+    },
+    "after": {
+      "name": "lookup_sku",
+      "description": "Look up a product by SKU.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku"
+        ]
+      }
+    }
+  }
+]

@@ -5,7 +5,7 @@
 There are two versions of the rules:
 
 - **v1** was evaluated on an unseen held-out set. Those are the honest numbers below.
-- **v2** fixes the five v1 failures. It has **not** been evaluated on unseen cases yet: the v1 held-out cases were used to make the fixes, so they no longer count as a test. See [v2](#v2-fixing-the-v1-failures).
+- **v2** fixes the five v1 failures, then was tested blind on 20 new cases written by a different author. See [v2 blind evaluation](#v2-blind-evaluation-held-out-set-2). **On that test, the rules ranked 0 of 8 dangerous changes as high priority.** The approval gate still held: no change skipped review.
 
 **Short answer (v1):** On 22 held-out tool changes, written after the rules were frozen, Watchdog ranked **7 of 9** sensitive changes as high priority and wrongly marked **2 of 11** routine changes as urgent. It never let a change skip review. In a review queue, the top 9 slots held 7 sensitive changes, compared with about 4 for a hash-only alert that treats every change equally.
 
@@ -86,13 +86,48 @@ Each fix targets the general cause of a failure, not the exact wording of the ca
 - **The five v1 failures are now handled**, each for the stated reason. These are regression tests in `tests/test_priority.py`. That proves the fixes work on those cases, and nothing more: the v1 held-out set scores 22/22 under v2 ([`heldout_SEEN_not_a_test.md`](bench/results/v2/heldout_SEEN_not_a_test.md)), but those cases were used to write the fixes.
 - **v2 rules are frozen** in [`bench/FROZEN_RULES_v2.sha256`](bench/FROZEN_RULES_v2.sha256).
 
-**Next:** evaluate v2 on a new held-out set (`bench/build_heldout2_cases.py`), ideally written by someone who hasn't read the rules. Until then, the only valid unseen-case result is the v1 result above.
+**Next:** evaluate v2 on a new held-out set. Done below.
 
 **Likely new weaknesses in v2:** the write/delete vocabulary will fire on legitimate descriptions that newly mention, say, "delete" for a tool that always could delete. The strong/weak split will under-rank a weak-named field whose danger is only implied (e.g. `path` with no description).
 
+## v2 blind evaluation (held-out set 2)
+
+20 cases on 20 new tools, written with an answer key by Aryan Jaggi without reading `priority.py`, after the v2 rules were frozen. The rule-file hashes were checked before the run, and nothing was changed afterwards. Cases: [`bench/build_heldout2_cases.py`](bench/build_heldout2_cases.py), per-case results: [`bench/results/v2/heldout2.md`](bench/results/v2/heldout2.md).
+
+| | v1 on held-out set 1 | **v2 on held-out set 2** |
+|---|---|---|
+| Changes that skipped review | 0 | **0** |
+| Formatting-only changes flagged (canonical) | 0 of 2 | **0 of 2** |
+| Sensitive changes ranked high | 7 of 9 | **0 of 8** |
+| Routine changes wrongly ranked high | 2 of 11 | **0 of 10** |
+| Sensitive changes in the top-k of the queue: watchdog vs. hash-only | 7 vs. 4.05 | **3 vs. 3.56** |
+
+**The prioritization failed on this set.** Every sensitive change described its risk in ordinary language:
+
+| case | change | ranked |
+|---|---|---|
+| Y03 | "current workspace" → "any workspace in the organization" | low |
+| Y05 | "prepare an invoice for review" → "…and deliver it to the saved billing contact" | low |
+| Y07 | "can be restored" → "the action is permanent" | low |
+| Y10 | "calculate the refund" → "…and apply it to the original payment method" | low |
+| Y12 | ticket ID "from the current project" → "from any project, including private projects" | low |
+| Y19 | "total headcount" → "employee roster with individual compensation" | low |
+| Y14 | export default adds `personal_email`, `mobile_number` | medium |
+| Y17 | visibility default `team` → `public` | medium |
+
+None of these contain the vocabulary the rules look for (paths, credentials, shell, "any file", write/delete verbs), so six were treated as wording edits and the two default-value changes as ordinary interface changes. With most sensitive changes ranked *below* routine schema changes, the queue ordering was slightly worse than an unranked hash alert.
+
+Three routine cases (Y04, Y09, Y13) were also ranked low instead of medium, for the same reason. One v2 fix did hold: Y04 mentions "token totals" and was not flagged as a secret, which v1 would have done.
+
+**What held:** the approval gate. Every one of the 18 real changes was paused for review and both formatting-only changes passed, so the failure cost review order, not security. That's the reason priority was never allowed to approve anything.
+
+**What this means:** keyword rules generalize poorly. v1's held-out set happened to contain many changes with recognizable vocabulary. This set describes capability changes (scope, side effects, irreversibility, data exposure) in plain words, which is closer to how a careful attacker would write them. This is the strongest argument in the project for a semantic classifier (an LLM reading the before/after text), evaluated on both held-out sets against these rules.
+
+**Encoding caveat:** the cases were specified in prose and turned into tool definitions by the assistant that wrote the rules, without changing the rules or labels. The encoding choices are listed at the top of `build_heldout2_cases.py`. Base tools carry no annotations, because the cases don't mention any.
+
 ## Threats to validity
 
-- **One author** wrote the rules and both case sets. A held-out set written by someone who hasn't read `priority.py` would be a stronger test.
+- **One author** wrote the rules, the dev set and held-out set 1. Held-out set 2 was written by a different author. A held-out set written by someone who hasn't read `priority.py` would be a stronger test.
 - **Small n.** At this size a single case moves a rate by 10 percentage points, which is why the results are reported as counts.
 - **Synthetic definitions.** The cases are hand-written mutations of hand-written tools, not changes observed in real MCP servers.
 - **Definitions only.** Watchdog can't see a server's runtime behavior or the content its tools return.

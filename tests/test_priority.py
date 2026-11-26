@@ -45,7 +45,7 @@ def test_new_benign_tool_is_medium():
     assert assess_new_tool(tool).priority is Priority.MEDIUM
 
 
-@pytest.mark.parametrize("case_set", ["dev", "heldout"])
+@pytest.mark.parametrize("case_set", ["dev", "heldout", "heldout2"])
 def test_benchmark_gate_never_weakened(case_set):
     """Whatever the priority, no change that needs review may be classed as 'none'."""
     m = evaluate(ROOT / "bench" / "cases" / f"{case_set}.json")

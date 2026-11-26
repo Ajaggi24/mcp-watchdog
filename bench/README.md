@@ -6,7 +6,7 @@ A small, labeled dataset of changes to MCP tool definitions, for measuring how w
 |---|---|---|
 | `cases/dev.json` | 40 | Labels written before any rules. The rules were developed against this set. |
 | `cases/heldout.json` | 22 | Written after the v1 rules were frozen (`FROZEN_RULES_v1.sha256`), on new tools. Used to fix v2, so it no longer tests v2. |
-| `cases/heldout2.json` | yours | Build it with `build_heldout2_cases.py`: the unseen test for the frozen v2 rules (`FROZEN_RULES_v2.sha256`). |
+| `cases/heldout2.json` | 20 | Written by a different author without reading the rules, after v2 was frozen (`FROZEN_RULES_v2.sha256`). The blind test for v2. |
 
 ## Case format
 

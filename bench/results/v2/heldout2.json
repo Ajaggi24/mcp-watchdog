@@ -1,0 +1,356 @@
+{
+  "set": "heldout2",
+  "n_cases": 20,
+  "labels": {
+    "low": 3,
+    "medium": 7,
+    "high": 8,
+    "none": 2
+  },
+  "gate": {
+    "needs_review_missed_by_watchdog": 0,
+    "needs_review_missed_by_canonical_hash": 0,
+    "needs_review_missed_by_raw_hash": 0,
+    "formatting_only_flagged_raw_hash": 1,
+    "formatting_only_flagged_canonical": 0,
+    "formatting_only_flagged_watchdog": 0,
+    "n_formatting_only": 2
+  },
+  "priority": {
+    "high_ranked_high": 0,
+    "n_high": 8,
+    "routine_ranked_high": 0,
+    "n_routine": 10,
+    "exact_label_match": 9
+  },
+  "queue": {
+    "k": 8,
+    "watchdog_high_in_top_k": 3.0,
+    "hash_high_in_top_k_expected": 3.56
+  },
+  "confusion": {
+    "high->low": 6,
+    "high->medium": 2,
+    "low->low": 3,
+    "medium->low": 3,
+    "medium->medium": 4,
+    "none->none": 2
+  },
+  "misses": [
+    {
+      "id": "Y03",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Expanded access: one workspace -> any workspace in the organization.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y05",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Prepare-only tool now delivers externally.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y07",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Reversible archive becomes permanent removal.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y10",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Preview-only tool now applies a refund (financial side effect).",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y12",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Expanded access to any project, including private ones.",
+      "pred": "low",
+      "reason": "wording change in field 'ticket_id' description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y14",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Default export now includes personal email and mobile number.",
+      "pred": "medium",
+      "reason": "field 'fields' default changed",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y17",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Default visibility widened from team to public.",
+      "pred": "medium",
+      "reason": "field 'visibility' default changed",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y19",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Aggregate headcount becomes individual compensation data.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    }
+  ],
+  "false_urgent": [],
+  "other_mismatches": [
+    {
+      "id": "Y04",
+      "group": "interface",
+      "label": "medium",
+      "rationale": "Reports additional usage data (token totals).",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y09",
+      "group": "interface",
+      "label": "medium",
+      "rationale": "Output timezone changes from local to UTC.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y13",
+      "group": "interface",
+      "label": "medium",
+      "rationale": "Result ordering reversed.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    }
+  ],
+  "rows": [
+    {
+      "id": "Y01",
+      "group": "cosmetic",
+      "label": "low",
+      "rationale": "Wording edit.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y02",
+      "group": "interface",
+      "label": "medium",
+      "rationale": "Default page size raised; maximum unchanged.",
+      "pred": "medium",
+      "reason": "field 'limit' default changed",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y03",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Expanded access: one workspace -> any workspace in the organization.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y04",
+      "group": "interface",
+      "label": "medium",
+      "rationale": "Reports additional usage data (token totals).",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y05",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Prepare-only tool now delivers externally.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y06",
+      "group": "interface",
+      "label": "medium",
+      "rationale": "Single date replaced by required start/end range.",
+      "pred": "medium",
+      "reason": "input field 'date' removed; new input field 'end_date'; new input field 'start_date'",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y07",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Reversible archive becomes permanent removal.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y08",
+      "group": "noop",
+      "label": "none",
+      "rationale": "Top-level schema keys reordered only.",
+      "pred": "none",
+      "reason": "no change after canonicalization",
+      "raw_flag": true,
+      "canon_flag": false
+    },
+    {
+      "id": "Y09",
+      "group": "interface",
+      "label": "medium",
+      "rationale": "Output timezone changes from local to UTC.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y10",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Preview-only tool now applies a refund (financial side effect).",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y11",
+      "group": "cosmetic",
+      "label": "low",
+      "rationale": "Spelling fix.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y12",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Expanded access to any project, including private ones.",
+      "pred": "low",
+      "reason": "wording change in field 'ticket_id' description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y13",
+      "group": "interface",
+      "label": "medium",
+      "rationale": "Result ordering reversed.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y14",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Default export now includes personal email and mobile number.",
+      "pred": "medium",
+      "reason": "field 'fields' default changed",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y15",
+      "group": "cosmetic",
+      "label": "low",
+      "rationale": "Prose formatting (paragraph break removed).",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y16",
+      "group": "interface",
+      "label": "medium",
+      "rationale": "New category from the same approved public catalog.",
+      "pred": "medium",
+      "reason": "field 'category' enum changed",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y17",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Default visibility widened from team to public.",
+      "pred": "medium",
+      "reason": "field 'visibility' default changed",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y18",
+      "group": "interface",
+      "label": "medium",
+      "rationale": "New output format; same inputs.",
+      "pred": "medium",
+      "reason": "field 'format' enum changed",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y19",
+      "group": "sensitive",
+      "label": "high",
+      "rationale": "Aggregate headcount becomes individual compensation data.",
+      "pred": "low",
+      "reason": "wording change in tool description",
+      "raw_flag": true,
+      "canon_flag": true
+    },
+    {
+      "id": "Y20",
+      "group": "noop",
+      "label": "none",
+      "rationale": "Same schema, serialized compact instead of indented (identical once parsed).",
+      "pred": "none",
+      "reason": "no change after canonicalization",
+      "raw_flag": false,
+      "canon_flag": false
+    }
+  ]
+}
